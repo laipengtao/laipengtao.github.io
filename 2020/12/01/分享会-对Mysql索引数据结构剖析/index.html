@@ -1,0 +1,562 @@
+
+
+<!DOCTYPE html>
+<html lang="zh-CN" data-default-color-scheme=&#34;auto&#34;>
+
+
+
+<head>
+  <meta charset="UTF-8">
+  <link rel="apple-touch-icon" sizes="76x76" href="/img/favicon.png">
+  <link rel="icon" href="/img/favicon.png">
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, shrink-to-fit=no">
+  <meta http-equiv="x-ua-compatible" content="ie=edge">
+  
+  <meta name="theme-color" content="#2f4154">
+  
+    <meta name="description" content="">
+  
+  <meta name="author" content="John Doe">
+  <meta name="keywords" content="">
+  
+  <title>分享会-对Mysql索引数据结构剖析 - Hexo</title>
+
+  <link  rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.5.3/dist/css/bootstrap.min.css" />
+
+
+  <link  rel="stylesheet" href="https://cdn.jsdelivr.net/npm/github-markdown-css@4.0.0/github-markdown.min.css" />
+  <link  rel="stylesheet" href="/lib/hint/hint.min.css" />
+
+  
+    
+    
+      
+      <link  rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@10.4.0/styles/github-gist.min.css" />
+    
+  
+
+  
+    <link  rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fancyapps/fancybox@3.5.7/dist/jquery.fancybox.min.css" />
+  
+
+
+
+<!-- 主题依赖的图标库，不要自行修改 -->
+
+<link rel="stylesheet" href="//at.alicdn.com/t/font_1749284_ba1fz6golrf.css">
+
+
+
+<link rel="stylesheet" href="//at.alicdn.com/t/font_1736178_kmeydafke9r.css">
+
+
+<link  rel="stylesheet" href="/css/main.css" />
+
+<!-- 自定义样式保持在最底部 -->
+
+
+  <script id="fluid-configs">
+    var Fluid = window.Fluid || {};
+    var CONFIG = {"hostname":"example.com","root":"/","version":"1.8.8","typing":{"enable":true,"typeSpeed":70,"cursorChar":"_","loop":false},"anchorjs":{"enable":true,"element":"h1,h2,h3,h4,h5,h6","placement":"right","visible":"hover","icon":""},"progressbar":{"enable":true,"height_px":3,"color":"#29d","options":{"showSpinner":false,"trickleSpeed":100}},"copy_btn":true,"image_zoom":{"enable":true},"toc":{"enable":true,"headingSelector":"h1,h2,h3,h4,h5,h6","collapseDepth":0},"lazyload":{"enable":true,"onlypost":false},"web_analytics":{"enable":false,"baidu":null,"google":null,"gtag":null,"tencent":{"sid":null,"cid":null},"woyaola":null,"cnzz":null,"leancloud":{"app_id":null,"app_key":null,"server_url":null}}};
+  </script>
+  <script  src="/js/utils.js" ></script>
+  <script  src="/js/color-schema.js" ></script>
+<meta name="generator" content="Hexo 5.4.0"></head>
+
+
+<body>
+  <header style="height: 70vh;">
+    <nav id="navbar" class="navbar fixed-top  navbar-expand-lg navbar-dark scrolling-navbar">
+  <div class="container">
+    <a class="navbar-brand"
+       href="/">&nbsp;<strong>Fluid</strong>&nbsp;</a>
+
+    <button id="navbar-toggler-btn" class="navbar-toggler" type="button" data-toggle="collapse"
+            data-target="#navbarSupportedContent"
+            aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+      <div class="animated-icon"><span></span><span></span><span></span></div>
+    </button>
+
+    <!-- Collapsible content -->
+    <div class="collapse navbar-collapse" id="navbarSupportedContent">
+      <ul class="navbar-nav ml-auto text-center">
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/">
+                <i class="iconfont icon-home-fill"></i>
+                首页
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/archives/">
+                <i class="iconfont icon-archive-fill"></i>
+                归档
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/categories/">
+                <i class="iconfont icon-category-fill"></i>
+                分类
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/tags/">
+                <i class="iconfont icon-tags-fill"></i>
+                标签
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/about/">
+                <i class="iconfont icon-user-fill"></i>
+                关于
+              </a>
+            </li>
+          
+        
+        
+          <li class="nav-item" id="search-btn">
+            <a class="nav-link" data-toggle="modal" data-target="#modalSearch">&nbsp;<i
+                class="iconfont icon-search"></i>&nbsp;</a>
+          </li>
+        
+        
+          <li class="nav-item" id="color-toggle-btn">
+            <a class="nav-link" href="javascript:">&nbsp;<i
+                class="iconfont icon-dark" id="color-toggle-icon"></i>&nbsp;</a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</nav>
+
+    <div class="banner" id="banner" parallax=true
+         style="background: url('/img/default.png') no-repeat center center;
+           background-size: cover;">
+      <div class="full-bg-img">
+        <div class="mask flex-center" style="background-color: rgba(0, 0, 0, 0.3)">
+          <div class="page-header text-center fade-in-up">
+            <span class="h2" id="subtitle" title="分享会-对Mysql索引数据结构剖析">
+              
+            </span>
+
+            
+              <div class="mt-3">
+  
+  
+    <span class="post-meta">
+      <i class="iconfont icon-date-fill" aria-hidden="true"></i>
+      <time datetime="2020-12-01 21:09" pubdate>
+        2020年12月1日 晚上
+      </time>
+    </span>
+  
+</div>
+
+<div class="mt-1">
+  
+    
+    <span class="post-meta mr-2">
+      <i class="iconfont icon-chart"></i>
+      764 字
+    </span>
+  
+
+  
+    
+    <span class="post-meta mr-2">
+      <i class="iconfont icon-clock-fill"></i>
+      
+      
+      9
+       分钟
+    </span>
+  
+
+  
+  
+</div>
+
+            
+          </div>
+
+          
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    
+      
+
+<div class="container-fluid nopadding-x">
+  <div class="row nomargin-x">
+    <div class="d-none d-lg-block col-lg-2"></div>
+    <div class="col-lg-8 nopadding-x-md">
+      <div class="container nopadding-x-md" id="board-ctn">
+        <div class="py-5" id="board">
+          <article class="post-content mx-auto">
+            <!-- SEO header -->
+            <h1 style="display: none">分享会-对Mysql索引数据结构剖析</h1>
+            
+            <div class="markdown-body">
+              <p>1、MySQL索引数据结构</p>
+<p>2、MySQL执行计划与索引实践</p>
+<p>3、SQL底层执行原理</p>
+<p>4、索引优化</p>
+<p>5、MySQL锁与事务隔离级别</p>
+<p>6、MVCC底层原理</p>
+<p>7、MySQL日志</p>
+<h1 id="MySQL索引数据结构"><a href="#MySQL索引数据结构" class="headerlink" title="MySQL索引数据结构"></a>MySQL索引数据结构</h1><p><strong>索引：</strong>是帮助MySQL高效获取数据的<strong>排好序</strong>的<strong>数据结构</strong>。</p>
+<p><strong>数据结构：</strong></p>
+<ul>
+<li><strong>二叉树:</strong> 单边递增，等于全表扫描。</li>
+<li><strong>红黑树:</strong> 二叉平衡树，单边过大会自动平衡。大数据量的情况下树的高度不可控。</li>
+<li><strong>Hash表：</strong>对索引的Key进行一次Hash计算就可以定位出数据存储的位置；很多时候hash索引要比B+树索引更高效；但是仅能满足 =、in 查询，不支持范围查询；hash冲突问题</li>
+<li><strong>B-Tree</strong>: 叶节点具有相同的深度，叶节点的指针为空；所有索引元素不重复；节点中的数据索引从左到右递增排列</li>
+<li><strong>B+Tree：</strong>(B-Tree的变种)  非叶子节点不存储data，只存储索引（冗余索引），可以存放更多的索引；叶子节点包含所有索引字段；叶子节点用双向指针连接，提高区间访问的性能</li>
+</ul>
+<p><strong>数据表：</strong></p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>col1</th>
+<th>col2</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>0x01</td>
+<td>1</td>
+<td>50</td>
+</tr>
+<tr>
+<td>0x02</td>
+<td>2</td>
+<td>43</td>
+</tr>
+<tr>
+<td>0x03</td>
+<td>3</td>
+<td>65</td>
+</tr>
+<tr>
+<td>0x04</td>
+<td>4</td>
+<td>23</td>
+</tr>
+<tr>
+<td>0x05</td>
+<td>5</td>
+<td>44</td>
+</tr>
+<tr>
+<td>0x06</td>
+<td>6</td>
+<td>78</td>
+</tr>
+<tr>
+<td>0x07</td>
+<td>7</td>
+<td>91</td>
+</tr>
+</tbody></table>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><code class="hljs sql"><span class="hljs-keyword">SELECT</span> <span class="hljs-operator">*</span> <span class="hljs-keyword">FROM</span> <span class="hljs-keyword">table</span> t <span class="hljs-keyword">WHERE</span> t.col2 <span class="hljs-operator">=</span> <span class="hljs-number">78</span>;<br><span class="hljs-keyword">SELECT</span> <span class="hljs-operator">*</span> <span class="hljs-keyword">FROM</span> <span class="hljs-keyword">table</span> t <span class="hljs-keyword">WHERE</span> t.col1 <span class="hljs-operator">=</span> <span class="hljs-number">6</span>;<br></code></pre></td></tr></table></figure>
+
+
+
+<p>二叉树：</p>
+<p><img src="https://s3.ax1x.com/2021/03/01/6i5h3F.png" srcset="/img/loading.gif" alt="1602988920229"></p>
+<p>B-Tree：</p>
+<p>data：磁盘文件所在地址，也有可能是整行数据记录。与存储引擎有关。</p>
+<p><img src="https://s3.ax1x.com/2021/03/01/6i54c4.png" srcset="/img/loading.gif" alt="1602990051836"></p>
+<p>B+Tree：</p>
+<p><img src="https://s3.ax1x.com/2021/03/01/6i57H1.png" srcset="/img/loading.gif" alt="1602990750336"></p>
+<p>B+Tree查找数据过程：</p>
+<p>假设查找col=30 （折半算法）</p>
+<ol>
+<li>从根节点开始查找，首先将根节点元素load到内存中；</li>
+<li>根据折半算法继续将冗余索引load到内存；</li>
+<li>继续查找到col=30的索引，再根据磁盘文件地址查找对应的数据记录。</li>
+</ol>
+<p><strong>思考？</strong>内存中根据折半算法比对相较于磁盘I/O时间可忽略不计，那是否可以将所有叶子节点全部load到内存？</p>
+<p><strong>升级！</strong>非叶子节点常驻内存。</p>
+<p>B+Tree索引元素大小</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><code class="hljs sql"><span class="hljs-keyword">SHOW</span> <span class="hljs-keyword">GLOBAL</span> STATUS <span class="hljs-keyword">LIKE</span> <span class="hljs-string">&#x27;Innodb_page_size&#x27;</span>;<br></code></pre></td></tr></table></figure>
+
+<p><img src="https://s3.ax1x.com/2021/03/01/6i5bAx.png" srcset="/img/loading.gif" alt="1602991493677"></p>
+<p>bigint：8Byte</p>
+<p>地址文件：6Byte</p>
+<p>16*1024/14=1170</p>
+<p>查看MySQL安装位置</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><code class="hljs sql"><span class="hljs-keyword">SHOW</span> VARIABLES <span class="hljs-keyword">LIKE</span> &quot;%char%&quot;;<br></code></pre></td></tr></table></figure>
+
+
+
+<h1 id="存储引擎"><a href="#存储引擎" class="headerlink" title="存储引擎"></a>存储引擎</h1><p><strong>MyISAM:</strong> 索引文件和数据文件是分离的（非聚集）,早期用的多。</p>
+<p><img src="https://s3.ax1x.com/2021/03/01/6i5X9O.png" srcset="/img/loading.gif" alt="1603013076316"></p>
+<p>*.frm</p>
+<p>*.MYD</p>
+<p>*.MYI</p>
+<p><strong>InnoDB:</strong> 现在用的多，<strong>聚集索引：</strong>叶节点包含了完整的数据记录。</p>
+<p>*.frm</p>
+<p>*.ibd</p>
+<p><strong>InnoDB主键索引</strong></p>
+<p>叶子节点存储的是完整的数据记录</p>
+<p><img src="https://s3.ax1x.com/2021/03/01/6iISud.png" srcset="/img/loading.gif" alt="1603013957536"></p>
+<p><strong>思考？</strong>为什么InnoDB表建议建立主键，并且推荐主键使用整型的<strong>自增</strong>主键？</p>
+<p><strong>InnoDB非主键索引</strong></p>
+<p>叶子节点存储的是主键值，并非完整的数据记录。</p>
+<p>为什么非主键索引结构叶子节点存储的是主键值？（一致性、节省存储空间）</p>
+<p><img src="https://s3.ax1x.com/2021/03/01/6iIF4f.png" srcset="/img/loading.gif" alt="1603110654354"></p>
+<p><strong>Hash</strong></p>
+<p><img src="https://s3.ax1x.com/2021/03/01/6iImuj.png" srcset="/img/loading.gif" alt="1603109798963"></p>
+<p><strong>联合索引</strong></p>
+<p><img src="https://s3.ax1x.com/2021/03/01/6iIubn.png" srcset="/img/loading.gif" alt="1603111920345"></p>
+<p><strong>思考？</strong>以下三句sql，分别会走索引吗？</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><code class="hljs sql"><span class="hljs-keyword">select</span> <span class="hljs-operator">*</span> <span class="hljs-keyword">from</span> t <span class="hljs-keyword">where</span> name <span class="hljs-operator">=</span> <span class="hljs-string">&#x27;Bill&#x27;</span> <span class="hljs-keyword">and</span> age <span class="hljs-operator">=</span> <span class="hljs-number">30</span>;<br><span class="hljs-keyword">select</span> <span class="hljs-operator">*</span> <span class="hljs-keyword">from</span> t <span class="hljs-keyword">where</span> age <span class="hljs-operator">=</span> <span class="hljs-number">30</span> <span class="hljs-keyword">and</span> position <span class="hljs-operator">=</span> <span class="hljs-string">&#x27;dev&#x27;</span>;<br><span class="hljs-keyword">select</span> <span class="hljs-operator">*</span> <span class="hljs-keyword">from</span> t <span class="hljs-keyword">where</span> position <span class="hljs-operator">=</span> <span class="hljs-string">&#x27;manager&#x27;</span>;<br></code></pre></td></tr></table></figure>
+
+
+
+
+
+
+
+
+
+
+            </div>
+            <hr>
+            <div>
+              <div class="post-metas mb-3">
+                
+                
+              </div>
+              
+                <p class="note note-warning">
+                  
+                    本博客所有文章除特别声明外，均采用 <a target="_blank" href="https://creativecommons.org/licenses/by-sa/4.0/deed.zh" rel="nofollow noopener noopener">CC BY-SA 4.0 协议</a> ，转载请注明出处！
+                  
+                </p>
+              
+              
+                <div class="post-prevnext">
+                  <article class="post-prev col-6">
+                    
+                    
+                      <a href="/2021/02/01/%E5%88%86%E4%BA%AB%E4%BC%9A-spring%20activity/">
+                        <i class="iconfont icon-arrowleft"></i>
+                        <span class="hidden-mobile">分享会-spring activity</span>
+                        <span class="visible-mobile">上一篇</span>
+                      </a>
+                    
+                  </article>
+                  <article class="post-next col-6">
+                    
+                    
+                      <a href="/2020/08/05/%E5%88%86%E4%BA%AB%E4%BC%9A-Docker/">
+                        <span class="hidden-mobile">分享会-Docker</span>
+                        <span class="visible-mobile">下一篇</span>
+                        <i class="iconfont icon-arrowright"></i>
+                      </a>
+                    
+                  </article>
+                </div>
+              
+            </div>
+
+            
+          </article>
+        </div>
+      </div>
+    </div>
+    
+      <div class="d-none d-lg-block col-lg-2 toc-container" id="toc-ctn">
+        <div id="toc">
+  <p class="toc-header"><i class="iconfont icon-list"></i>&nbsp;目录</p>
+  <div class="toc-body" id="toc-body"></div>
+</div>
+
+      </div>
+    
+  </div>
+</div>
+
+<!-- Custom -->
+
+
+    
+
+    
+      <a id="scroll-top-button" href="#" role="button">
+        <i class="iconfont icon-arrowup" aria-hidden="true"></i>
+      </a>
+    
+
+    
+      <div class="modal fade" id="modalSearch" tabindex="-1" role="dialog" aria-labelledby="ModalLabel"
+     aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable modal-lg" role="document">
+    <div class="modal-content">
+      <div class="modal-header text-center">
+        <h4 class="modal-title w-100 font-weight-bold">搜索</h4>
+        <button type="button" id="local-search-close" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body mx-3">
+        <div class="md-form mb-5">
+          <input type="text" id="local-search-input" class="form-control validate">
+          <label data-error="x" data-success="v"
+                 for="local-search-input">关键词</label>
+        </div>
+        <div class="list-group" id="local-search-result"></div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+
+    
+  </main>
+
+  <footer class="text-center mt-5 py-3">
+  <div class="footer-content">
+     <a href="https://hexo.io" target="_blank" rel="nofollow noopener"><span>Hexo</span></a> <i class="iconfont icon-love"></i> <a href="https://github.com/fluid-dev/hexo-theme-fluid" target="_blank" rel="nofollow noopener"><span>Fluid</span></a> 
+  </div>
+  
+
+  
+
+  
+</footer>
+
+<!-- SCRIPTS -->
+
+  <script  src="https://cdn.jsdelivr.net/npm/nprogress@0.2.0/nprogress.min.js" ></script>
+  <link  rel="stylesheet" href="https://cdn.jsdelivr.net/npm/nprogress@0.2.0/nprogress.min.css" />
+
+  <script>
+    NProgress.configure({"showSpinner":false,"trickleSpeed":100})
+    NProgress.start()
+    window.addEventListener('load', function() {
+      NProgress.done();
+    })
+  </script>
+
+
+<script  src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.min.js" ></script>
+<script  src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.3/dist/js/bootstrap.min.js" ></script>
+<script  src="/js/debouncer.js" ></script>
+<script  src="/js/events.js" ></script>
+<script  src="/js/plugins.js" ></script>
+
+<!-- Plugins -->
+
+
+  
+    <script  src="/js/lazyload.js" ></script>
+  
+
+
+
+  
+
+
+
+  <script  src="https://cdn.jsdelivr.net/npm/tocbot@4.12.0/dist/tocbot.min.js" ></script>
+
+
+
+  <script  src="https://cdn.jsdelivr.net/npm/@fancyapps/fancybox@3.5.7/dist/jquery.fancybox.min.js" ></script>
+
+
+
+  <script  src="https://cdn.jsdelivr.net/npm/anchor-js@4.3.0/anchor.min.js" ></script>
+
+
+
+  <script defer src="https://cdn.jsdelivr.net/npm/clipboard@2.0.6/dist/clipboard.min.js" ></script>
+
+
+
+
+
+
+  <script  src="https://cdn.jsdelivr.net/npm/typed.js@2.0.11/lib/typed.min.js" ></script>
+  <script>
+    (function (window, document) {
+      var typing = Fluid.plugins.typing;
+      var title = document.getElementById('subtitle').title;
+      
+      typing(title)
+      
+    })(window, document);
+  </script>
+
+
+
+  <script  src="/js/local-search.js" ></script>
+  <script>
+    (function () {
+      var path = "/local-search.xml";
+      $('#local-search-input').on('click', function() {
+        searchFunc(path, 'local-search-input', 'local-search-result');
+      });
+      $('#modalSearch').on('shown.bs.modal', function() {
+        $('#local-search-input').focus();
+      });
+    })()
+  </script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!-- 主题的启动项 保持在最底部 -->
+<script  src="/js/boot.js" ></script>
+
+
+
+</body>
+</html>
